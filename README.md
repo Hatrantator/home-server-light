@@ -13,7 +13,7 @@ This guide provides a step-by-step walkthrough for setting up a home automation 
 ---
 
 ## 1. BIOS Configuration: AMD-V Activation
-To run Docker and virtualized environments efficiently on a **Ryzen 3 4300U**, you must enable hardware virtualization.
+To run Docker and virtualized environments efficiently on a **Ryzen**, you must enable hardware virtualization.
 
 * **Enter BIOS/UEFI**: Restart your computer and press `F2`, `Del`, or `Esc`.
 * **Navigate**: Go to the **Advanced** or **CPU Configuration** menu.
@@ -97,7 +97,7 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - /run/dbus:/run/dbus:ro
     environment:
-      - TZ=Europe/Berlin # Replace with your actual Timezone
+      - TZ=${TZ} # Replace with your actual Timezone
 ```
 Ensure you define the `${TZ}` variable or replace it directly with your actual timezone (e.g., `Europe/Berlin`).
 
