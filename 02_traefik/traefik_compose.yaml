@@ -1,0 +1,72 @@
+services:
+  # certificate generator
+  mkcert:
+    image: alpine:latest
+    container_name: mkcert
+    volumes:
+      - traefik_certs:/certs_output
+    entrypoint: /bin/sh -c
+    command: 
+      - "-c"
+      - |
+        apk add --no-cache curl && 
+        curl -L https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-linux-amd64 -o /usr/local/bin/mkcert && 
+        chmod +x /usr/local/bin/mkcert && 
+        mkcert -install && 
+        mkcert -cert-file /certs_output/localdomain.pem -key-file /certs_output/localdomain-key.pem localdomain '*.localdomain' dockerhost.localdomain '*.dockerhost.localdomain' && 
+        cp $(mkcert -CAROOT)/rootCA.pem /certs_output/rootCA.pem && 
+        printf 'tls:\n  certificates:\n    - certFile: /certs_output/localdomain.pem\n      keyFile: /certs_output/localdomain-key.pem\n  stores:\n    default:\n      defaultCertificate:\n        certFile: /certs_output/localdomain.pem\n        keyFile: /certs_output/localdomain-key.pem' > /certs_output/traefik_config.yml
+      #- "apk add --no-cache curl && curl -L https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-linux-amd64 -o /usr/local/bin/mkcert && chmod +x /usr/local/bin/mkcert && mkcert -install && mkcert -cert-file /certs_output/localdomain.pem -key-file /certs_output/localdomain-key.pem localdomain '*.localdomain' dockerhost.localdomain '*.dockerhost.localdomain'"
+
+  traefik:
+    image: traefik:v3.6
+    container_name: traefik
+    depends_on:
+      mkcert:
+        condition: service_completed_successfully
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_certs:/certs_output:ro
+      - ./traefik_config/dynamic_conf.yml:/traefik_config.yml:ro
+    command:
+      - "--log.level=DEBUG"
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # local cert file provider
+      - "--providers.file.filename=/certs_output/traefik_config.yml"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`${service}.${domain}`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls=true"
+    networks:
+      - traefik-proxy
+
+volumes:
+  traefik_certs:
+
+networks:
+   traefik-proxy:
+     external: true
+
+  # example for stack
+  #whoami:
+  #  image: traefik/whoami
+  #  labels:
+  #    - "traefik.enable=true"
+  #    - "traefik.http.routers.${service}.rule=Host(`${service}.${domain}`)"
+  #    - "traefik.http.routers.${service}.entrypoints=websecure"
+  #    - "traefik.http.routers.${service}.tls=true"
+  #    - "traefik.http.services.${service}.loadbalancer.server.port=${port}"
+  #  networks:
+  #    - traefik-proxy
+  #networks:
+  # traefik-proxy:
+  #   external: true

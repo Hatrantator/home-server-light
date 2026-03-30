@@ -1,0 +1,68 @@
+services:
+  homeassistant:
+    container_name: homeassistant
+    image: ghcr.io/home-assistant/home-assistant:stable
+    restart: unless-stopped
+    privileged: true
+    #network_mode: host
+    networks:
+      - traefik-proxy
+    ports:
+      - "${port}:${port}"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${service}.rule=Host(`${service}.${domain}`)"
+      - "traefik.http.services.${service}.loadbalancer.server.port=${port}"
+      - "traefik.http.routers.${service}.entrypoints=websecure"
+      - "traefik.http.routers.${service}.tls=true"
+    volumes:
+      - home-assistant:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
+    environment:
+      - TZ=${TZ}
+  
+  mosquitto:
+    container_name: mosquitto
+    image: eclipse-mosquitto:latest
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    command: "mosquitto -c /mosquitto-no-auth.conf"
+    volumes:
+      - mosquitto:/mosquitto/data
+
+  node-red:
+    container_name: nodered
+    image: nodered/node-red:latest
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ}
+    ports:
+      - "1880:1880"
+    volumes:
+      - nodered:/data
+
+  zigbee2mqtt:
+    container_name: zigbee2mqtt
+    restart: unless-stopped
+    image: koenkk/zigbee2mqtt
+    volumes:
+      - zigbee2mqtt:/app/data
+      - /run/udev:/run/udev:ro
+    ports:
+      - "8080:8080"
+    environment:
+      - TZ=${TZ}
+    #devices:
+    #  - /dev/ttyUSB0:/dev/ttyUSB1
+
+volumes:
+  home-assistant:
+  mosquitto:
+  nodered:
+  zigbee2mqtt:
+
+networks:
+   traefik-proxy:
+     external: true
